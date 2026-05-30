@@ -626,15 +626,10 @@
       o['요청사항'] || ''
     ]);
 
-    const bom = '﻿';
-    const csv = [headers, ...rows]
-      .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
-      .join('\r\n');
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `CJ_${viewDate}.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, '송장');
+    XLSX.writeFile(wb, `CJ_${viewDate}.xls`);
   }
 
   // ── 재고 관리 ─────────────────────────────────────────
