@@ -727,7 +727,7 @@
 
   // ── CJ대한통운 엑셀 다운로드 ─────────────────────────
   function downloadCJ() {
-    const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === viewDate);
+    const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === viewDate && o['처리상태'] !== '취소');
     if (!dayOrders.length) { alert('해당 날짜 주문이 없습니다.'); return; }
 
     const headers = [
