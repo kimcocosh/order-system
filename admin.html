@@ -448,6 +448,27 @@
 <div class="copy-toast" id="copy-toast">✅ 복사되었습니다!</div>
 
 <script>
+  // ══════════════════════════════════════════════════════
+  // ★ 단가 설정 (여기서 직접 수정하세요)
+  // ══════════════════════════════════════════════════════
+
+  // 기본 단가 (모든 업체 공통)
+  const DEFAULT_PRICES = {
+    '오리지널(달콤)': 4000, '새콤': 4000, '옥수수': 4000,
+    '고구마': 4000, '바나나': 4000, '망고': 4000,
+    '패션후르츠': 4000, '블러드오렌지': 4000, '말차': 4000,
+    '토마토': 4000, '블루베리': 4000,
+    '라이트&드라이': 2800, '옥수수7도': 2800, '생쌀9도': 3500,
+    '이밤에취해': 17000, '옥주15-감': 17000, '옥주15-신': 17000, '옥주15-무': 17000,
+  };
+
+  // 업체별 예외 단가 — { '업체명': { '품목명': 단가 } }
+  // 예시: const EXCEPTION_PRICES = { '취아현': { '망고': 3500 } };
+  const EXCEPTION_PRICES = {
+  };
+
+  // ══════════════════════════════════════════════════════
+
   // ── 설정 ──────────────────────────────────────────────
   const WEBAPP_URL  = 'https://script.google.com/macros/s/AKfycbxbpnr3MeRL9fpeMDnks3f1rPnD3aFbgPuy77doP7qJsijON0T0sIgCAexqCScKfEh0LA/exec';
   const PASSWORD    = 'admin1234';
@@ -931,15 +952,12 @@
     const shipDate = document.getElementById('entax-shipdate').value;
     if (!from || !to || !shipDate) { alert('날짜를 모두 선택해주세요.'); return; }
 
-    // 단가표 로드
-    const pRes = await api('prices');
-    const priceList = pRes.prices || [];
-
+    // 단가 조회 (로컬 설정 기반)
     function getPrice(clientName, productName) {
-      const specific = priceList.find(p => p.client === clientName && p.product === productName);
-      if (specific) return specific.price;
-      const def = priceList.find(p => p.client === '' && p.product === productName);
-      return def ? def.price : 0;
+      if (EXCEPTION_PRICES[clientName] && EXCEPTION_PRICES[clientName][productName] !== undefined) {
+        return EXCEPTION_PRICES[clientName][productName];
+      }
+      return DEFAULT_PRICES[productName] || 0;
     }
 
     // 거래처 사업자번호 맵
