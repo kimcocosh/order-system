@@ -1017,7 +1017,7 @@
         const supply = price * item.qty;
         const tax    = Math.round(supply * 0.1);
         rows.push([
-          seq++, new Date(shipDate), '매출', '', bizNum, clientName,
+          seq++, shipDate, '매출', '', bizNum, clientName,
           '', item.name, '', 'EA', price, item.qty, supply, tax,
           '청구', '과세', '', '', 1, 1,
           note, '', '', '', '', ''
