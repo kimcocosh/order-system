@@ -323,34 +323,33 @@
   // ★ 수정 구역 — 안내문구 & 발주 그룹 설정
   // ══════════════════════════════════════════════════════
 
-  // 상단 안내문구 (줄바꿈: \n 사용)
+  // 상단 안내문구
   const NOTICE_LINES = [
     '⚠️ 재고 상황에 따라 주문이 제한될 수 있습니다. 재고 부족 시 별도 안내드립니다.',
-    '📦 500ml 9도 (오리지널·새콤·옥수수·고구마·바나나·망고·패션후르츠·블러드오렌지·말차·토마토·블루베리) — 혼합 최소 14병',
-    '📦 750ml (라이트&드라이·옥수수7도·생쌀9도) — 혼합 최소 20병',
-    '📦 유리병 (이밤에취해·옥주15-감·옥주15-신·옥주15-무) — 혼합 최소 6병',
+    '📦 500ml 9도 (오리지널·새콤·옥수수·고구마·바나나·망고·패션후르츠·블러드오렌지·말차·토마토·블루베리) — 14~20병 또는 24병 이상',
+    '📦 750ml (라이트&드라이·옥수수7도·생쌀9도) — 최소 20병',
+    '📦 500ml + 750ml 혼합 주문 시 — 합계 최소 20병',
+    '📦 유리병 (이밤에취해·옥주15-감·옥주15-신·옥주15-무) — 최소 6병',
   ];
 
-  // 최소발주 그룹 설정
-  // items: 상품목록 시트의 품목명과 정확히 일치해야 합니다
-  const ORDER_GROUPS = [
-    {
-      label: '500ml 9도',
-      minQty: 14,
-      items: ['오리지널(달콤)', '새콤', '옥수수', '고구마', '바나나', '망고',
-              '패션후르츠', '블러드오렌지', '말차', '토마토', '블루베리']
-    },
-    {
-      label: '750ml',
-      minQty: 20,
-      items: ['라이트&드라이', '옥수수7도', '생쌀9도']
-    },
-    {
-      label: '유리병',
-      minQty: 6,
-      items: ['이밤에취해', '옥주15-감', '옥주15-신', '옥주15-무']
-    },
-  ];
+  // ── 그룹 품목 정의 (상품목록 시트 품목명과 정확히 일치해야 함) ──
+  const G_500 = ['오리지널(달콤)', '새콤', '옥수수', '고구마', '바나나', '망고',
+                 '패션후르츠', '블러드오렌지', '말차', '토마토', '블루베리'];
+  const G_750 = ['라이트&드라이', '옥수수7도', '생쌀9도'];
+  const G_GLASS = ['이밤에취해', '옥주15-감', '옥주15-신', '옥주15-무'];
+
+  // ── 500ml 단독 규칙 ──
+  // MIN: 최소 수량 / MAX_SINGLE: 단독 허용 최대 / NEXT_MIN: 초과 시 다음 허용 수량
+  const R_500 = { MIN: 14, MAX_SINGLE: 20, NEXT_MIN: 24 };
+
+  // ── 750ml 단독 최소 ──
+  const R_750_MIN = 20;
+
+  // ── 500ml + 750ml 혼합 시 합계 최소 ──
+  const R_MIX_MIN = 20;
+
+  // ── 유리병 최소 ──
+  const R_GLASS_MIN = 6;
 
   // ══════════════════════════════════════════════════════
 
@@ -483,13 +482,38 @@
     const qtyMap = {};
     items.forEach(i => { qtyMap[i.name] = i.qty; });
 
+    const t500   = G_500.reduce((s, n)   => s + (qtyMap[n] || 0), 0);
+    const t750   = G_750.reduce((s, n)   => s + (qtyMap[n] || 0), 0);
+    const tGlass = G_GLASS.reduce((s, n) => s + (qtyMap[n] || 0), 0);
+
     const groupErrors = [];
-    ORDER_GROUPS.forEach(g => {
-      const total = g.items.reduce((s, n) => s + (qtyMap[n] || 0), 0);
-      if (total > 0 && total < g.minQty) {
-        groupErrors.push(`${g.label}: ${total}병 선택 (최소 ${g.minQty}병)`);
+
+    // 500ml + 750ml 혼합 여부에 따라 분기
+    if (t500 > 0 && t750 > 0) {
+      // 혼합: 합계만 체크
+      const total = t500 + t750;
+      if (total < R_MIX_MIN) {
+        groupErrors.push(`500ml + 750ml 혼합: ${total}병 → 합계 최소 ${R_MIX_MIN}병`);
       }
-    });
+    } else {
+      // 500ml 단독
+      if (t500 > 0) {
+        if (t500 < R_500.MIN) {
+          groupErrors.push(`500ml: ${t500}병 → 최소 ${R_500.MIN}병`);
+        } else if (t500 > R_500.MAX_SINGLE && t500 < R_500.NEXT_MIN) {
+          groupErrors.push(`500ml: ${t500}병 선택 불가 → ${R_500.MAX_SINGLE}병 이하 또는 ${R_500.NEXT_MIN}병 이상으로 조정해 주세요`);
+        }
+      }
+      // 750ml 단독
+      if (t750 > 0 && t750 < R_750_MIN) {
+        groupErrors.push(`750ml: ${t750}병 → 최소 ${R_750_MIN}병`);
+      }
+    }
+
+    // 유리병 (항상 독립 체크)
+    if (tGlass > 0 && tGlass < R_GLASS_MIN) {
+      groupErrors.push(`유리병: ${tGlass}병 → 최소 ${R_GLASS_MIN}병`);
+    }
 
     if (!items.length) {
       body.innerHTML = '<div class="summary-empty">선택된 품목이 없습니다</div>';
