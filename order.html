@@ -316,6 +316,13 @@
   <div class="icon">✅</div>
   <h2>주문이 접수되었습니다!</h2>
   <p id="done-msg">담당자가 확인 후 연락드립니다.</p>
+  <button id="btn-cancel-order" style="
+    margin-top:16px; padding:12px 24px;
+    border-radius:10px; border:2px solid #adb5bd;
+    background:#fff; color:#6c757d;
+    font-size:.9rem; font-weight:600; cursor:pointer;
+  ">주문 취소</button>
+  <p id="cancel-notice" style="font-size:.78rem;color:#adb5bd;margin-top:8px"></p>
 </div>
 
 <script>
@@ -326,6 +333,7 @@
   // 상단 안내문구
   const NOTICE_LINES = [
     '⚠️ 재고 상황에 따라 주문이 제한될 수 있습니다. 재고 부족 시 별도 안내드립니다.',
+    '🕒 주문 취소는 당일 오후 3시 이전까지만 가능합니다. 이후에는 포장이 진행되어 취소가 어렵습니다.',
     '📦 500ml 9도 (오리지널·새콤·옥수수·고구마·바나나·망고·패션후르츠·블러드오렌지·말차·토마토·블루베리) — 최소 14병, 이후 24병 단위로 발주 부탁드립니다 (14병 혼합 가능)',
     '📦 750ml (라이트&드라이·옥수수7도·생쌀9도) — 최소 20병',
     '📦 500ml + 750ml 혼합 주문 시 — 합계 최소 20병',
@@ -579,6 +587,21 @@
         msg = `일부 품목(${insuf.map(i=>i.name).join(', ')})은 재고가 부족합니다. 담당자가 별도 안내드립니다.`;
       }
       document.getElementById('done-msg').textContent = msg;
+
+      // 취소 버튼 설정
+      const now = new Date();
+      const isAfterDeadline = now.getHours() >= 15;
+      const cancelBtn    = document.getElementById('btn-cancel-order');
+      const cancelNotice = document.getElementById('cancel-notice');
+      if (isAfterDeadline) {
+        cancelBtn.disabled = true;
+        cancelBtn.style.opacity = '0.4';
+        cancelBtn.style.cursor  = 'not-allowed';
+        cancelNotice.textContent = '오후 3시 이후에는 취소가 불가합니다.';
+      } else {
+        cancelBtn.dataset.rowIndex = res.rowIndex || '';
+        cancelNotice.textContent = '오후 3시 이전까지 취소 가능합니다.';
+      }
       show('screen-done');
     } catch (e) {
       btn.disabled = false;
@@ -590,6 +613,21 @@
   function closeModal() {
     document.getElementById('modal').classList.remove('open');
   }
+
+  // 취소 버튼
+  document.getElementById('btn-cancel-order').addEventListener('click', async () => {
+    const rowIndex = parseInt(document.getElementById('btn-cancel-order').dataset.rowIndex);
+    if (!rowIndex) { alert('취소할 주문 정보를 찾을 수 없습니다.'); return; }
+    if (!confirm('주문을 취소하시겠습니까?')) return;
+    try {
+      await apiPost('updateStatus', { rowIndex, status: '취소' });
+      document.getElementById('btn-cancel-order').disabled = true;
+      document.getElementById('btn-cancel-order').textContent = '취소 완료';
+      document.getElementById('cancel-notice').textContent = '주문이 취소되었습니다.';
+    } catch(e) {
+      alert('취소 중 오류가 발생했습니다: ' + e.message);
+    }
+  });
 
   // ── API 헬퍼 ──────────────────────────────────────────
   function api(action) {
