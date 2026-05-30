@@ -304,6 +304,7 @@
 
     <div class="action-row">
       <button class="btn btn-green" onclick="downloadCJ()">📥 CJ대한통운 엑셀 다운로드</button>
+      <button class="btn btn-outline" onclick="showEntaxModal()">📊 ENtax CS 엑셀 다운로드</button>
     </div>
 
     <div class="filter-row">
@@ -364,6 +365,21 @@
           📋 클립보드 복사 (카카오톡 붙여넣기용)
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ENtax CS 기간 선택 모달 -->
+<div class="modal-overlay" id="entax-modal" style="display:none;align-items:center;justify-content:center">
+  <div class="modal" style="max-width:340px;text-align:left">
+    <h3 style="margin-bottom:14px">📊 ENtax CS 엑셀 다운로드</h3>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">시작일</label>
+    <input type="date" id="entax-from" style="width:100%;padding:9px;border:2px solid var(--border);border-radius:8px;margin-bottom:10px;font-size:.9rem" />
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">종료일</label>
+    <input type="date" id="entax-to" style="width:100%;padding:9px;border:2px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:.9rem" />
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-gray" style="flex:1" onclick="closeEntaxModal()">취소</button>
+      <button class="btn btn-green" style="flex:1" onclick="downloadEntax()">다운로드</button>
     </div>
   </div>
 </div>
@@ -716,6 +732,99 @@
     const t = document.getElementById('copy-toast');
     t.style.display = 'block';
     setTimeout(() => { t.style.display = 'none'; }, 2000);
+  }
+
+  // ── ENtax CS 다운로드 ─────────────────────────────────
+  function showEntaxModal() {
+    const today = todayStr();
+    const firstDay = today.substring(0,7) + '-01';
+    document.getElementById('entax-from').value = firstDay;
+    document.getElementById('entax-to').value   = today;
+    document.getElementById('entax-modal').style.display = 'flex';
+  }
+  function closeEntaxModal() {
+    document.getElementById('entax-modal').style.display = 'none';
+  }
+
+  async function downloadEntax() {
+    const from = document.getElementById('entax-from').value;
+    const to   = document.getElementById('entax-to').value;
+    if (!from || !to) { alert('날짜를 선택해주세요.'); return; }
+
+    // 단가표 로드
+    const pRes = await api('prices');
+    const priceList = pRes.prices || [];
+
+    function getPrice(clientName, productName) {
+      const specific = priceList.find(p => p.client === clientName && p.product === productName);
+      if (specific) return specific.price;
+      const def = priceList.find(p => p.client === '' && p.product === productName);
+      return def ? def.price : 0;
+    }
+
+    // 기간 내 주문 필터
+    const filtered = allOrders.filter(o => {
+      const d = new Date(o['타임스탬프']);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return ds >= from && ds <= to;
+    });
+
+    if (!filtered.length) { alert('해당 기간 주문이 없습니다.'); return; }
+
+    // ENtax CS 컬럼
+    const headers = ['번호','작성날짜','유형','우리사업자번호','거래처사업자번호','거래처명',
+      '품목코드','품목명','규격','단위','단가','수량','공급가액','세액',
+      '청구여부','과세유형','이수금','담당자번호','담당자비율','담당자상여',
+      '비고','카드번호','주문번호','판매방식','일련번호','큰상자'];
+
+    const rows = [];
+    let seq = 1;
+
+    filtered.forEach(o => {
+      const ts   = new Date(o['타임스탬프']);
+      const dateSerial = Math.floor((ts - new Date(1899,11,30)) / 86400000);
+      const clientName = o['업체명'] || '';
+      const itemStr    = o['내품명'] || '';
+      const note       = o['요청사항'] || '';
+
+      // "망고 10 패션후르츠 5" 파싱
+      const tokens = itemStr.trim().split(/\s+/);
+      const items  = [];
+      for (let i = 0; i < tokens.length - 1; i += 2) {
+        const name = tokens[i];
+        const qty  = parseInt(tokens[i+1]) || 0;
+        if (name && qty > 0) items.push({ name, qty });
+      }
+
+      items.forEach(item => {
+        const price    = getPrice(clientName, item.name);
+        const supply   = price * item.qty;
+        const tax      = Math.round(supply * 0.1);
+        rows.push([
+          seq++, dateSerial, '매출', '', '', clientName,
+          '', item.name, '', 'EA', price, item.qty, supply, tax,
+          '청구', '과세', '', '', 1, 0,
+          note, '', '', '', '', ''
+        ]);
+      });
+    });
+
+    if (!rows.length) { alert('품목 데이터를 파싱할 수 없습니다.'); return; }
+
+    // CSV 생성 (ENtax CS는 xls/csv 모두 지원)
+    const bom = '﻿';
+    const csv = [headers, ...rows]
+      .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
+      .join('\r\n');
+
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `ENtax_${from}_${to}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    closeEntaxModal();
   }
 
   // ── API ───────────────────────────────────────────────
