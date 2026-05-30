@@ -247,6 +247,28 @@
     }
     .btn-cancel { background: var(--gray-light); color: #212529; }
     .btn-confirm { background: var(--green); color: #fff; }
+
+    /* ── 내 주문 내역 ── */
+    .my-order-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .my-order-item:last-child { border-bottom: none; }
+    .my-order-time { font-size:.78rem; color:var(--gray); margin-bottom:4px; }
+    .my-order-items { font-size:.9rem; font-weight:600; margin-bottom:8px; }
+    .my-order-status {
+      display:inline-block; padding:2px 10px; border-radius:20px;
+      font-size:.75rem; font-weight:700; margin-bottom:8px;
+    }
+    .status-pending  { background:#fff3cd; color:#664d03; }
+    .status-done     { background:var(--green-pale); color:var(--green); }
+    .status-cancelled{ background:#e9ecef; color:var(--gray); }
+    .btn-my-cancel {
+      padding:7px 14px; border:2px solid var(--border);
+      background:#fff; color:var(--gray);
+      border-radius:8px; font-size:.82rem; font-weight:600; cursor:pointer;
+    }
+    .btn-my-cancel:disabled { opacity:.4; cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -290,6 +312,14 @@
     <div class="summary-card" id="summary-card">
       <div class="summary-title">🛒 주문 요약</div>
       <div id="summary-body"><div class="summary-empty">선택된 품목이 없습니다</div></div>
+    </div>
+
+    <!-- 오늘 주문 내역 -->
+    <div id="my-orders-section" style="display:none">
+      <div class="card">
+        <div class="card-title">📋 오늘 내 주문 내역</div>
+        <div id="my-orders-list"></div>
+      </div>
     </div>
   </div>
 
@@ -389,6 +419,7 @@
       products = pRes.products || [];
       renderForm();
       show('screen-form');
+      loadMyOrders();
     } catch (e) {
       showError();
     }
@@ -612,6 +643,66 @@
 
   function closeModal() {
     document.getElementById('modal').classList.remove('open');
+  }
+
+  // ── 오늘 내 주문 내역 ─────────────────────────────────
+  async function loadMyOrders() {
+    try {
+      const res = await api('orders');
+      const orders = (res.orders || []).filter(o => {
+        const ts = new Date(o['타임스탬프']);
+        const d  = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
+        const today = new Date();
+        const t = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        return d === t && o['업체명'] === client.name;
+      });
+
+      if (!orders.length) return;
+
+      const section = document.getElementById('my-orders-section');
+      const list    = document.getElementById('my-orders-list');
+      const now     = new Date();
+      const isAfterDeadline = now.getHours() >= 15;
+
+      list.innerHTML = orders.map(o => {
+        const ts   = new Date(o['타임스탬프']);
+        const time = `${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
+        const status = o['처리상태'] || '미처리';
+        const isCancelled = status === '취소';
+        const isDone      = status === '처리완료';
+        const canCancel   = !isCancelled && !isDone && !isAfterDeadline;
+        const statusClass = isCancelled ? 'status-cancelled' : isDone ? 'status-done' : 'status-pending';
+
+        return `
+          <div class="my-order-item">
+            <div class="my-order-time">${time} 접수</div>
+            <div class="my-order-items">📦 ${o['내품명'] || '-'}</div>
+            <span class="my-order-status ${statusClass}">${status}</span><br>
+            <button class="btn-my-cancel"
+              ${!canCancel ? 'disabled' : ''}
+              onclick="cancelMyOrder(${o.rowIndex}, this)">
+              ${isCancelled ? '취소됨' : isDone ? '처리완료' : isAfterDeadline ? '취소불가(3시 이후)' : '주문 취소'}
+            </button>
+          </div>`;
+      }).join('');
+
+      section.style.display = 'block';
+    } catch(e) {
+      console.log('내 주문 로드 실패:', e.message);
+    }
+  }
+
+  async function cancelMyOrder(rowIndex, btn) {
+    if (!confirm('이 주문을 취소하시겠습니까?')) return;
+    try {
+      await apiPost('updateStatus', { rowIndex, status: '취소' });
+      btn.disabled = true;
+      btn.textContent = '취소됨';
+      btn.closest('.my-order-item').querySelector('.my-order-status').textContent = '취소';
+      btn.closest('.my-order-item').querySelector('.my-order-status').className = 'my-order-status status-cancelled';
+    } catch(e) {
+      alert('취소 중 오류가 발생했습니다.');
+    }
   }
 
   // 취소 버튼
