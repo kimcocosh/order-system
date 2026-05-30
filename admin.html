@@ -320,17 +320,29 @@
 
   <!-- ── 주문 현황 탭 ── -->
   <div class="tab-panel active" id="tab-orders">
+
+    <!-- 날짜 네비게이션 -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:12px;background:#fff;border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)">
+      <button class="btn btn-outline btn-sm" onclick="moveDate(-1)">◀</button>
+      <span id="view-date-label" style="font-weight:700;font-size:1rem;min-width:110px;text-align:center"></span>
+      <button class="btn btn-outline btn-sm" onclick="moveDate(1)">▶</button>
+      <button class="btn btn-gray btn-sm" onclick="goToday()">오늘</button>
+    </div>
+
+    <!-- 통계 -->
     <div class="stat-row">
-      <div class="stat-card"><div class="num" id="stat-today">0</div><div class="lbl">오늘 주문</div></div>
+      <div class="stat-card"><div class="num" id="stat-today">0</div><div class="lbl">해당일 주문</div></div>
       <div class="stat-card"><div class="num" id="stat-pending">0</div><div class="lbl">미처리</div></div>
       <div class="stat-card"><div class="num" id="stat-done">0</div><div class="lbl">처리완료</div></div>
     </div>
 
+    <!-- 액션 버튼 -->
     <div class="action-row">
-      <button class="btn btn-green" onclick="downloadCJ()">📥 CJ대한통운 엑셀 다운로드</button>
-      <button class="btn btn-outline" onclick="showEntaxModal()">📊 ENtax CS 엑셀 다운로드</button>
+      <button class="btn btn-green" onclick="downloadCJ()">📥 CJ 엑셀</button>
+      <button class="btn btn-outline" onclick="showEntaxModal()">📊 ENtax 엑셀</button>
     </div>
 
+    <!-- 필터 -->
     <div class="filter-row">
       <button class="filter-btn active" onclick="setFilter('all',this)">전체</button>
       <button class="filter-btn" onclick="setFilter('미처리',this)">미처리</button>
@@ -352,8 +364,6 @@
         <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center"></div>
       </div>
     </div>
-
-    <!-- 선택된 날짜 주문 목록 -->
     <div id="cal-day-orders" style="display:none">
       <div class="card-header" style="border-radius:var(--radius) var(--radius) 0 0;background:var(--green-pale)">
         <h3 id="cal-day-title" style="color:var(--green);font-size:.95rem"></h3>
@@ -415,14 +425,19 @@
   </div>
 </div>
 
-<!-- ENtax CS 기간 선택 모달 -->
+<!-- ENtax CS 모달 -->
 <div class="modal-overlay" id="entax-modal" style="display:none;align-items:center;justify-content:center">
   <div class="modal" style="max-width:340px;text-align:left">
-    <h3 style="margin-bottom:14px">📊 ENtax CS 엑셀 다운로드</h3>
-    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">시작일</label>
-    <input type="date" id="entax-from" style="width:100%;padding:9px;border:2px solid var(--border);border-radius:8px;margin-bottom:10px;font-size:.9rem" />
-    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">종료일</label>
-    <input type="date" id="entax-to" style="width:100%;padding:9px;border:2px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:.9rem" />
+    <h3 style="margin-bottom:6px">📊 ENtax CS 엑셀 다운로드</h3>
+    <p style="font-size:.8rem;color:var(--gray);margin-bottom:14px">처리완료 주문만 출력됩니다</p>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">주문 날짜 (기간)</label>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <input type="date" id="entax-from" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;font-size:.9rem" />
+      <span style="line-height:38px;color:var(--gray)">~</span>
+      <input type="date" id="entax-to" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;font-size:.9rem" />
+    </div>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">출고일 (작성날짜)</label>
+    <input type="date" id="entax-shipdate" style="width:100%;padding:9px;border:2px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:.9rem" />
     <div style="display:flex;gap:8px">
       <button class="btn btn-gray" style="flex:1" onclick="closeEntaxModal()">취소</button>
       <button class="btn btn-green" style="flex:1" onclick="downloadEntax()">다운로드</button>
@@ -443,6 +458,7 @@
   let allProducts = [];
   let allClients  = [];
   let currentFilter = 'all';
+  let viewDate = todayStr(); // 주문 현황 선택 날짜
 
   // ── 로그인 ────────────────────────────────────────────
   function doLogin() {
@@ -483,6 +499,18 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
+  // ── 날짜 네비게이션 ──────────────────────────────────
+  function moveDate(dir) {
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() + dir);
+    viewDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    renderOrders();
+  }
+  function goToday() {
+    viewDate = todayStr();
+    renderOrders();
+  }
+
   function setFilter(f, btn) {
     currentFilter = f;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -491,21 +519,21 @@
   }
 
   function renderOrders() {
-    const today = todayStr();
-    const todayOrders = allOrders.filter(o => {
-      const ts = new Date(o['타임스탬프']);
-      const d = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
-      return d === today;
-    });
+    // 날짜 레이블
+    const [y,m,d] = viewDate.split('-');
+    const isToday = viewDate === todayStr();
+    document.getElementById('view-date-label').textContent =
+      `${y}.${m}.${d}${isToday ? ' (오늘)' : ''}`;
 
-    const pending = todayOrders.filter(o => o['처리상태'] !== '처리완료');
-    const done    = todayOrders.filter(o => o['처리상태'] === '처리완료');
+    const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === viewDate);
+    const pending = dayOrders.filter(o => o['처리상태'] !== '처리완료');
+    const done    = dayOrders.filter(o => o['처리상태'] === '처리완료');
 
-    document.getElementById('stat-today').textContent   = todayOrders.length;
+    document.getElementById('stat-today').textContent   = dayOrders.length;
     document.getElementById('stat-pending').textContent = pending.length;
     document.getElementById('stat-done').textContent    = done.length;
 
-    let filtered = todayOrders;
+    let filtered = dayOrders;
     if (currentFilter === '미처리')   filtered = pending;
     if (currentFilter === '처리완료') filtered = done;
 
@@ -517,14 +545,18 @@
 
     list.innerHTML = filtered.map(o => {
       const isDone = o['처리상태'] === '처리완료';
-      const ts = new Date(o['타임스탬프']);
+      const ts   = new Date(o['타임스탬프']);
       const time = `${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
+      const isLate = ts.getHours() >= 15;
       return `
         <div class="order-card ${isDone ? 'done' : ''}">
           <div class="order-head">
             <div>
               <div class="order-name">${o['업체명'] || ''}</div>
-              <div class="order-time">${time} · ${o['전화번호'] || ''}</div>
+              <div class="order-time">
+                ${time} · ${o['전화번호'] || ''}
+                ${isLate && !isDone ? '<span style="color:var(--orange);font-weight:700;margin-left:4px">⚠️ 익일출고</span>' : ''}
+              </div>
             </div>
             <div style="display:flex;gap:6px;align-items:center">
               <span class="status-badge ${isDone ? 'done' : 'pending'}">
@@ -556,44 +588,31 @@
 
   // ── CJ대한통운 엑셀 다운로드 ─────────────────────────
   function downloadCJ() {
-    const today = todayStr();
-    const todayOrders = allOrders.filter(o => {
-      const ts = new Date(o['타임스탬프']);
-      const d = `${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}`;
-      return d === today;
-    });
-
-    if (!todayOrders.length) { alert('오늘 주문이 없습니다.'); return; }
+    const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === viewDate);
+    if (!dayOrders.length) { alert('해당 날짜 주문이 없습니다.'); return; }
 
     const headers = [
       '받는분성명','받는분전화번호','받는분주소(전체, 분할)',
       '품목명','박스','운임구분','박스타입','내품명','배송메세지1'
     ];
-
-    const rows = todayOrders.map(o => [
+    const rows = dayOrders.map(o => [
       o['업체명']   || '',
       o['전화번호'] || '',
       o['주소']     || '',
-      '신선식품(냉장)',
-      1,
-      '신용',
-      '극소',
+      '신선식품(냉장)', 1, '신용', '극소',
       o['내품명']   || '',
       o['요청사항'] || ''
     ]);
 
+    const bom = '﻿';
     const csv = [headers, ...rows]
       .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
       .join('\r\n');
-
-    const bom  = '﻿';
     const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `CJ_${today}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = `CJ_${viewDate}.csv`;
+    a.click(); URL.revokeObjectURL(url);
   }
 
   // ── 재고 관리 ─────────────────────────────────────────
@@ -897,10 +916,9 @@
 
   // ── ENtax CS 다운로드 ─────────────────────────────────
   function showEntaxModal() {
-    const today = todayStr();
-    const firstDay = today.substring(0,7) + '-01';
-    document.getElementById('entax-from').value = firstDay;
-    document.getElementById('entax-to').value   = today;
+    document.getElementById('entax-from').value     = viewDate;
+    document.getElementById('entax-to').value       = viewDate;
+    document.getElementById('entax-shipdate').value = viewDate;
     document.getElementById('entax-modal').style.display = 'flex';
   }
   function closeEntaxModal() {
@@ -908,9 +926,10 @@
   }
 
   async function downloadEntax() {
-    const from = document.getElementById('entax-from').value;
-    const to   = document.getElementById('entax-to').value;
-    if (!from || !to) { alert('날짜를 선택해주세요.'); return; }
+    const from     = document.getElementById('entax-from').value;
+    const to       = document.getElementById('entax-to').value;
+    const shipDate = document.getElementById('entax-shipdate').value;
+    if (!from || !to || !shipDate) { alert('날짜를 모두 선택해주세요.'); return; }
 
     // 단가표 로드
     const pRes = await api('prices');
@@ -923,16 +942,14 @@
       return def ? def.price : 0;
     }
 
-    // 기간 내 주문 필터
+    // 기간 내 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const d = new Date(o['타임스탬프']);
-      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      return ds >= from && ds <= to;
+      const dk = dateKey(o['타임스탬프']);
+      return dk >= from && dk <= to && o['처리상태'] === '처리완료';
     });
 
-    if (!filtered.length) { alert('해당 기간 주문이 없습니다.'); return; }
+    if (!filtered.length) { alert('해당 기간 처리완료 주문이 없습니다.'); return; }
 
-    // ENtax CS 컬럼
     const headers = ['번호','작성날짜','유형','우리사업자번호','거래처사업자번호','거래처명',
       '품목코드','품목명','규격','단위','단가','수량','공급가액','세액',
       '청구여부','과세유형','이수금','담당자번호','담당자비율','담당자상여',
@@ -942,8 +959,6 @@
     let seq = 1;
 
     filtered.forEach(o => {
-      const ts   = new Date(o['타임스탬프']);
-      const dateSerial = Math.floor((ts - new Date(1899,11,30)) / 86400000);
       const clientName = o['업체명'] || '';
       const itemStr    = o['내품명'] || '';
       const note       = o['요청사항'] || '';
@@ -951,18 +966,18 @@
       // "망고 10 패션후르츠 5" 파싱
       const tokens = itemStr.trim().split(/\s+/);
       const items  = [];
-      for (let i = 0; i < tokens.length - 1; i += 2) {
+      for (let i = 0; i + 1 < tokens.length; i += 2) {
         const name = tokens[i];
         const qty  = parseInt(tokens[i+1]) || 0;
         if (name && qty > 0) items.push({ name, qty });
       }
 
       items.forEach(item => {
-        const price    = getPrice(clientName, item.name);
-        const supply   = price * item.qty;
-        const tax      = Math.round(supply * 0.1);
+        const price  = getPrice(clientName, item.name);
+        const supply = price * item.qty;
+        const tax    = Math.round(supply * 0.1);
         rows.push([
-          seq++, dateSerial, '매출', '', '', clientName,
+          seq++, shipDate, '매출', '', '', clientName,
           '', item.name, '', 'EA', price, item.qty, supply, tax,
           '청구', '과세', '', '', 1, 0,
           note, '', '', '', '', ''
@@ -972,17 +987,15 @@
 
     if (!rows.length) { alert('품목 데이터를 파싱할 수 없습니다.'); return; }
 
-    // CSV 생성 (ENtax CS는 xls/csv 모두 지원)
     const bom = '﻿';
     const csv = [headers, ...rows]
       .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
       .join('\r\n');
-
     const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `ENtax_${from}_${to}.csv`;
+    a.href = url;
+    a.download = `ENtax_${from}~${to}_출고${shipDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     closeEntaxModal();
