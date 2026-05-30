@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>옥수주조 관리자</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1010,17 +1011,10 @@
 
     if (!rows.length) { alert('품목 데이터를 파싱할 수 없습니다.'); return; }
 
-    const bom = '﻿';
-    const csv = [headers, ...rows]
-      .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
-      .join('\r\n');
-    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `ENtax_${from}~${to}_출고${shipDate}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    XLSX.utils.book_append_sheet(wb, ws, '거래내역');
+    XLSX.writeFile(wb, `ENtax_${from}~${to}_출고${shipDate}.xls`);
     closeEntaxModal();
   }
 
