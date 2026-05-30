@@ -495,11 +495,33 @@
   }
 
 
+  // ── 거래처 시트에서 사업자번호 직접 읽기 ────────────
+  const SHEET_ID = '1TFW2-hbXTNR_AljzO68__eXlxiwqPdoJ6QEhjYSuzXo';
+  let bizNumMap = {}; // { '업체명': '사업자번호' }
+
+  async function loadBizNums() {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=거래처`;
+      const res  = await fetch(url);
+      const text = await res.text();
+      const rows = text.split('\n').slice(7); // 8행부터 데이터
+      rows.forEach(row => {
+        const cols = row.split(',').map(c => c.replace(/^"|"$/g,'').trim());
+        const name   = cols[1] || ''; // B열
+        const bizNum = cols[8] || ''; // I열
+        if (name && bizNum) bizNumMap[name] = bizNum;
+      });
+    } catch (e) {
+      console.log('사업자번호 로드 실패:', e.message);
+    }
+  }
+
   // ── 새로고침 ──────────────────────────────────────────
   async function refreshAll() {
     try {
       const [oRes, sRes, pRes, cRes] = await Promise.all([
-        api('orders'), api('stock'), api('products'), api('clients')
+        api('orders'), api('stock'), api('products'), api('clients'),
+        loadBizNums()
       ]);
       allOrders   = oRes.orders   || [];
       allStock    = sRes.stock    || [];
@@ -956,9 +978,8 @@
       return DEFAULT_PRICES[productName] || 0;
     }
 
-    // 거래처 사업자번호 맵
-    const bizMap = {};
-    allClients.forEach(c => { bizMap[c.name] = c.bizNum || ''; });
+    // 거래처 사업자번호 맵 (시트 직접 읽은 데이터)
+    const bizMap = bizNumMap;
 
     // 기간 내 처리완료 주문만
     const filtered = allOrders.filter(o => {
