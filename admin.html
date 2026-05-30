@@ -570,13 +570,17 @@
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=거래처`;
       const res  = await fetch(url);
       const text = await res.text();
-      const rows = text.split('\n').slice(7); // 8행부터 데이터
-      rows.forEach(row => {
-        const cols = parseCSVRow(row);
-        const name   = cols[1] || ''; // B열
-        const bizNum = cols[8] || ''; // I열
-        if (name && bizNum) bizNumMap[name] = bizNum;
+      const lines = text.split('\n');
+      lines.forEach(line => {
+        const cols = parseCSVRow(line);
+        const name   = (cols[1] || '').trim();
+        const bizNum = (cols[8] || '').trim();
+        // 헤더/빈행 제외: 사업자번호 형식(숫자-숫자-숫자)인 경우만 저장
+        if (name && bizNum && /\d{3}-\d{2}-\d{5}/.test(bizNum)) {
+          bizNumMap[name] = bizNum;
+        }
       });
+      console.log('사업자번호 로드:', Object.keys(bizNumMap).length, '개');
     } catch (e) {
       console.log('사업자번호 로드 실패:', e.message);
     }
