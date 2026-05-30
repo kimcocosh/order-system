@@ -338,8 +338,8 @@
 
     <!-- 액션 버튼 -->
     <div class="action-row">
-      <button class="btn btn-green" onclick="downloadCJ()">📥 CJ 엑셀</button>
-      <button class="btn btn-outline" onclick="showEntaxModal()">📊 ENtax 엑셀</button>
+      <button class="btn btn-green" onclick="downloadCJ()">📥 CJ택배 송장 엑셀</button>
+      <button class="btn btn-outline" onclick="showEntaxModal()">📊 엔텍스 거래내역</button>
     </div>
 
     <!-- 필터 -->
@@ -942,6 +942,10 @@
       return def ? def.price : 0;
     }
 
+    // 거래처 사업자번호 맵
+    const bizMap = {};
+    allClients.forEach(c => { bizMap[c.name] = c.bizNum || ''; });
+
     // 기간 내 처리완료 주문만
     const filtered = allOrders.filter(o => {
       const dk = dateKey(o['타임스탬프']);
@@ -960,6 +964,7 @@
 
     filtered.forEach(o => {
       const clientName = o['업체명'] || '';
+      const bizNum     = bizMap[clientName] || '';
       const itemStr    = o['내품명'] || '';
       const note       = o['요청사항'] || '';
 
@@ -977,7 +982,7 @@
         const supply = price * item.qty;
         const tax    = Math.round(supply * 0.1);
         rows.push([
-          seq++, shipDate, '매출', '', '', clientName,
+          seq++, shipDate, '매출', '', bizNum, clientName,
           '', item.name, '', 'EA', price, item.qty, supply, tax,
           '청구', '과세', '', '', 1, 0,
           note, '', '', '', '', ''
