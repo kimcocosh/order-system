@@ -252,6 +252,29 @@
     /* ── 다운로드 버튼 행 ── */
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 
+    /* ── 캘린더 ── */
+    .cal-head { font-size:.75rem; font-weight:700; color:var(--gray); padding:6px 0; }
+    .cal-day {
+      border-radius:8px; padding:6px 4px; min-height:52px;
+      cursor:pointer; transition:background .15s;
+      display:flex; flex-direction:column; align-items:center; gap:2px;
+    }
+    .cal-day:hover { background:var(--green-pale); }
+    .cal-day.today { background:#e8f5e9; }
+    .cal-day.selected { background:var(--green); color:#fff; }
+    .cal-day.selected .cal-badge { background:#fff; color:var(--green); }
+    .cal-day.other-month { opacity:.35; }
+    .cal-day.empty { cursor:default; }
+    .cal-day.empty:hover { background:none; }
+    .cal-num { font-size:.85rem; font-weight:700; }
+    .cal-badge {
+      background:var(--green); color:#fff;
+      border-radius:10px; font-size:.7rem; font-weight:700;
+      padding:1px 6px; min-width:18px;
+    }
+    .cal-deadline { font-size:.62rem; color:var(--orange); font-weight:700; }
+    .cal-day.selected .cal-deadline { color:#ffe082; }
+
     /* ── 빈 상태 ── */
     .empty-state {
       text-align: center; padding: 40px 20px;
@@ -289,6 +312,7 @@
 
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('orders')">📋 주문 현황</button>
+    <button class="tab-btn" onclick="switchTab('calendar')">📅 캘린더</button>
     <button class="tab-btn" onclick="switchTab('stock')">📦 재고 관리</button>
     <button class="tab-btn" onclick="switchTab('products')">🏷️ 상품 관리</button>
     <button class="tab-btn" onclick="switchTab('template')">💬 멘트 템플릿</button>
@@ -314,6 +338,28 @@
     </div>
 
     <div id="order-list"></div>
+  </div>
+
+  <!-- ── 캘린더 탭 ── -->
+  <div class="tab-panel" id="tab-calendar">
+    <div class="card">
+      <div class="card-header" style="justify-content:space-between">
+        <button class="btn btn-outline btn-sm" onclick="calMove(-1)">◀ 이전달</button>
+        <h3 id="cal-title" style="font-size:1rem"></h3>
+        <button class="btn btn-outline btn-sm" onclick="calMove(1)">다음달 ▶</button>
+      </div>
+      <div style="padding:12px">
+        <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center"></div>
+      </div>
+    </div>
+
+    <!-- 선택된 날짜 주문 목록 -->
+    <div id="cal-day-orders" style="display:none">
+      <div class="card-header" style="border-radius:var(--radius) var(--radius) 0 0;background:var(--green-pale)">
+        <h3 id="cal-day-title" style="color:var(--green);font-size:.95rem"></h3>
+      </div>
+      <div id="cal-day-list" style="background:#fff;border-radius:0 0 var(--radius) var(--radius);box-shadow:var(--shadow)"></div>
+    </div>
   </div>
 
   <!-- ── 재고 관리 탭 ── -->
@@ -410,15 +456,6 @@
     }
   }
 
-  // ── 탭 전환 ───────────────────────────────────────────
-  function switchTab(name) {
-    document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      const names = ['orders','stock','products','template'];
-      b.classList.toggle('active', names[i] === name);
-    });
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-'+name).classList.add('active');
-  }
 
   // ── 새로고침 ──────────────────────────────────────────
   async function refreshAll() {
@@ -732,6 +769,131 @@
     const t = document.getElementById('copy-toast');
     t.style.display = 'block';
     setTimeout(() => { t.style.display = 'none'; }, 2000);
+  }
+
+  // ── 캘린더 ───────────────────────────────────────────
+  let calYear  = new Date().getFullYear();
+  let calMonth = new Date().getMonth(); // 0-based
+  const ORDER_DEADLINE_HOUR = 15; // 오후 3시
+
+  function switchTab(name) {
+    const names = ['orders','calendar','stock','products','template'];
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', names[i] === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-'+name).classList.add('active');
+    if (name === 'calendar') renderCalendar();
+  }
+
+  function calMove(dir) {
+    calMonth += dir;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    if (calMonth < 0)  { calMonth = 11; calYear--; }
+    renderCalendar();
+  }
+
+  function dateKey(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function renderCalendar() {
+    document.getElementById('cal-title').textContent =
+      `${calYear}년 ${calMonth+1}월`;
+
+    // 날짜별 주문 수 집계
+    const countMap = {};
+    allOrders.forEach(o => {
+      const k = dateKey(o['타임스탬프']);
+      countMap[k] = (countMap[k] || 0) + 1;
+    });
+
+    const grid  = document.getElementById('cal-grid');
+    const today = todayStr();
+    const days  = ['일','월','화','수','목','금','토'];
+
+    grid.innerHTML = days.map(d =>
+      `<div class="cal-head">${d}</div>`
+    ).join('');
+
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const lastDate = new Date(calYear, calMonth+1, 0).getDate();
+    const prevLast = new Date(calYear, calMonth, 0).getDate();
+
+    // 이전달 빈칸
+    for (let i = 0; i < firstDay; i++) {
+      const d = prevLast - firstDay + 1 + i;
+      grid.innerHTML += `<div class="cal-day other-month empty"><div class="cal-num">${d}</div></div>`;
+    }
+
+    // 이번달
+    for (let d = 1; d <= lastDate; d++) {
+      const key  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const cnt  = countMap[key] || 0;
+      const isToday = key === today;
+      let cls = 'cal-day';
+      if (isToday) cls += ' today';
+      if (!cnt) cls += ' empty';
+
+      grid.innerHTML += `
+        <div class="${cls}" onclick="${cnt ? `showDayOrders('${key}')` : ''}">
+          <div class="cal-num">${d}</div>
+          ${cnt ? `<div class="cal-badge">${cnt}건</div>` : ''}
+          ${isToday ? `<div class="cal-deadline">마감 15:00</div>` : ''}
+        </div>`;
+    }
+
+    // 다음달 빈칸
+    const remaining = (7 - (firstDay + lastDate) % 7) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      grid.innerHTML += `<div class="cal-day other-month empty"><div class="cal-num">${i}</div></div>`;
+    }
+
+    // 선택된 날 주문 숨기기
+    document.getElementById('cal-day-orders').style.display = 'none';
+  }
+
+  function showDayOrders(dateStr) {
+    // 선택 스타일
+    document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected'));
+    event.currentTarget.classList.add('selected');
+
+    const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === dateStr);
+    const wrap = document.getElementById('cal-day-orders');
+    const title = document.getElementById('cal-day-title');
+    const list  = document.getElementById('cal-day-list');
+
+    const [y,m,d] = dateStr.split('-');
+    title.textContent = `${y}년 ${parseInt(m)}월 ${parseInt(d)}일 주문 내역 (${dayOrders.length}건)`;
+
+    if (!dayOrders.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">📭</div>주문 없음</div>';
+    } else {
+      list.innerHTML = dayOrders.map(o => {
+        const ts   = new Date(o['타임스탬프']);
+        const time = `${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
+        const isLate = ts.getHours() >= ORDER_DEADLINE_HOUR;
+        const isDone = o['처리상태'] === '처리완료';
+        return `
+          <div class="order-card ${isDone ? 'done' : ''}" style="margin:8px;border-radius:var(--radius)">
+            <div class="order-head">
+              <div>
+                <div class="order-name">${o['업체명'] || ''}</div>
+                <div class="order-time">
+                  ${time}
+                  ${isLate ? '<span style="color:var(--orange);font-weight:700;margin-left:4px">⚠️ 익일출고</span>' : ''}
+                </div>
+              </div>
+              <span class="status-badge ${isDone ? 'done' : 'pending'}">${isDone ? '처리완료' : '미처리'}</span>
+            </div>
+            <div class="order-body">
+              <div class="order-items">📦 ${o['내품명'] || '-'}</div>
+              ${o['요청사항'] ? `<div class="order-note">💬 ${o['요청사항']}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    }
+    wrap.style.display = 'block';
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── ENtax CS 다운로드 ─────────────────────────────────
