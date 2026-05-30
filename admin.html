@@ -547,6 +547,24 @@
   const SHEET_ID = '1TFW2-hbXTNR_AljzO68__eXlxiwqPdoJ6QEhjYSuzXo';
   let bizNumMap = {}; // { '업체명': '사업자번호' }
 
+  function parseCSVRow(row) {
+    const result = [];
+    let cur = '', inQuote = false;
+    for (let i = 0; i < row.length; i++) {
+      const ch = row[i];
+      if (ch === '"') {
+        if (inQuote && row[i+1] === '"') { cur += '"'; i++; }
+        else inQuote = !inQuote;
+      } else if (ch === ',' && !inQuote) {
+        result.push(cur.trim()); cur = '';
+      } else {
+        cur += ch;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
   async function loadBizNums() {
     try {
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=거래처`;
@@ -554,7 +572,7 @@
       const text = await res.text();
       const rows = text.split('\n').slice(7); // 8행부터 데이터
       rows.forEach(row => {
-        const cols = row.split(',').map(c => c.replace(/^"|"$/g,'').trim());
+        const cols = parseCSVRow(row);
         const name   = cols[1] || ''; // B열
         const bizNum = cols[8] || ''; // I열
         if (name && bizNum) bizNumMap[name] = bizNum;
