@@ -163,8 +163,9 @@
       padding: 3px 10px; border-radius: 20px;
       font-size: .75rem; font-weight: 700;
     }
-    .status-badge.pending  { background: #fff3cd; color: #664d03; }
-    .status-badge.done     { background: var(--green-pale); color: var(--green); }
+    .status-badge.pending   { background: #fff3cd; color: #664d03; }
+    .status-badge.done      { background: var(--green-pale); color: var(--green); }
+    .status-badge.cancelled { background: #e9ecef; color: var(--gray); }
 
     /* ── 필터 행 ── */
     .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -658,12 +659,13 @@
     }
 
     list.innerHTML = filtered.map(o => {
-      const isDone = o['처리상태'] === '처리완료';
+      const isDone      = o['처리상태'] === '처리완료';
+      const isCancelled = o['처리상태'] === '취소';
       const ts   = new Date(o['타임스탬프']);
       const time = `${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
       const isLate = ts.getHours() >= 15;
       return `
-        <div class="order-card ${isDone ? 'done' : ''}">
+        <div class="order-card ${isDone || isCancelled ? 'done' : ''}">
           <div class="order-head">
             <div>
               <div class="order-name">${o['업체명'] || ''}</div>
@@ -672,14 +674,16 @@
                 ${isLate && !isDone ? '<span style="color:var(--orange);font-weight:700;margin-left:4px">⚠️ 익일출고</span>' : ''}
               </div>
             </div>
-            <div style="display:flex;gap:6px;align-items:center">
-              <span class="status-badge ${isDone ? 'done' : 'pending'}">
-                ${isDone ? '처리완료' : '미처리'}
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+              <span class="status-badge ${isDone ? 'done' : isCancelled ? 'cancelled' : 'pending'}">
+                ${isDone ? '처리완료' : isCancelled ? '취소' : '미처리'}
               </span>
-              <button class="btn btn-sm ${isDone ? 'btn-gray' : 'btn-green'}"
+              ${!isCancelled ? `<button class="btn btn-sm ${isDone ? 'btn-gray' : 'btn-green'}"
                 onclick="toggleStatus(${o.rowIndex},'${isDone ? '미처리' : '처리완료'}')">
                 ${isDone ? '되돌리기' : '완료 처리'}
-              </button>
+              </button>` : ''}
+              <button class="btn btn-sm btn-gray" onclick="cancelOrder(${o.rowIndex})">취소</button>
+              <button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>
             </div>
           </div>
           <div class="order-body">
@@ -696,6 +700,27 @@
       await apiPost('updateStatus', { rowIndex, status: newStatus });
       const o = allOrders.find(x => x.rowIndex === rowIndex);
       if (o) o['처리상태'] = newStatus;
+      renderOrders();
+    } catch (e) { alert('오류: ' + e.message); }
+  }
+
+  async function cancelOrder(rowIndex) {
+    if (!confirm('이 주문을 취소 처리하시겠습니까?')) return;
+    try {
+      await apiPost('updateStatus', { rowIndex, status: '취소' });
+      const o = allOrders.find(x => x.rowIndex === rowIndex);
+      if (o) o['처리상태'] = '취소';
+      renderOrders();
+    } catch (e) { alert('오류: ' + e.message); }
+  }
+
+  async function deleteOrder(rowIndex) {
+    if (!confirm('이 주문을 완전히 삭제하시겠습니까?\n삭제 후 복구가 불가능합니다.')) return;
+    try {
+      await apiPost('deleteOrder', { rowIndex });
+      allOrders = allOrders.filter(x => x.rowIndex !== rowIndex);
+      // rowIndex 재정렬
+      allOrders.forEach(o => { if (o.rowIndex > rowIndex) o.rowIndex--; });
       renderOrders();
     } catch (e) { alert('오류: ' + e.message); }
   }
