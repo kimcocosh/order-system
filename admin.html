@@ -725,7 +725,7 @@
   function apiPost(action, data) {
     return fetch(`${WEBAPP_URL}?action=${action}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(data)
     }).then(r => r.json());
   }
