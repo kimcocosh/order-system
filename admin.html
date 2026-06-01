@@ -777,7 +777,11 @@
     ]);
 
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, [], ...rows]); // 2행 빈행, 3행부터 데이터
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['옥수주조'],  // 1행: 형시명
+      headers,       // 2행: 양식(컬럼명)
+      ...rows        // 3행~: 데이터
+    ]);
     XLSX.utils.book_append_sheet(wb, ws, '송장');
     XLSX.writeFile(wb, `CJ_${viewDate}.xls`);
   }
