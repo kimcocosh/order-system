@@ -165,7 +165,8 @@
     }
     .status-badge.pending   { background: #fff3cd; color: #664d03; }
     .status-badge.done      { background: var(--green-pale); color: var(--green); }
-    .status-badge.cancelled { background: #e9ecef; color: var(--gray); }
+    .status-badge.cancelled  { background: #e9ecef; color: var(--gray); }
+    .status-badge.confirmed  { background: #cfe2ff; color: #0d6efd; }
 
     /* ── 필터 행 ── */
     .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -335,6 +336,7 @@
     <div class="stat-row">
       <div class="stat-card"><div class="num" id="stat-today">0</div><div class="lbl">해당일 주문</div></div>
       <div class="stat-card"><div class="num" id="stat-pending">0</div><div class="lbl">미처리</div></div>
+      <div class="stat-card"><div class="num" id="stat-confirmed">0</div><div class="lbl" style="color:#0d6efd">주문확인</div></div>
       <div class="stat-card"><div class="num" id="stat-done">0</div><div class="lbl">처리완료</div></div>
     </div>
 
@@ -349,6 +351,7 @@
     <div class="filter-row">
       <button class="filter-btn active" onclick="setFilter('all',this)">전체</button>
       <button class="filter-btn" onclick="setFilter('미처리',this)">미처리</button>
+      <button class="filter-btn" onclick="setFilter('주문확인',this)">주문확인</button>
       <button class="filter-btn" onclick="setFilter('처리완료',this)">처리완료</button>
     </div>
 
@@ -696,15 +699,18 @@
       `${y}.${m}.${d}${isToday ? ' (오늘)' : ''}`;
 
     const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === viewDate);
-    const pending = dayOrders.filter(o => o['처리상태'] !== '처리완료');
-    const done    = dayOrders.filter(o => o['처리상태'] === '처리완료');
+    const pending   = dayOrders.filter(o => o['처리상태'] === '미처리');
+    const confirmed = dayOrders.filter(o => o['처리상태'] === '주문확인');
+    const done      = dayOrders.filter(o => o['처리상태'] === '처리완료');
 
-    document.getElementById('stat-today').textContent   = dayOrders.length;
-    document.getElementById('stat-pending').textContent = pending.length;
-    document.getElementById('stat-done').textContent    = done.length;
+    document.getElementById('stat-today').textContent     = dayOrders.length;
+    document.getElementById('stat-pending').textContent   = pending.length;
+    document.getElementById('stat-confirmed').textContent = confirmed.length;
+    document.getElementById('stat-done').textContent      = done.length;
 
     let filtered = dayOrders;
     if (currentFilter === '미처리')   filtered = pending;
+    if (currentFilter === '주문확인') filtered = confirmed;
     if (currentFilter === '처리완료') filtered = done;
 
     const list = document.getElementById('order-list');
@@ -714,11 +720,39 @@
     }
 
     list.innerHTML = filtered.map(o => {
-      const isDone      = o['처리상태'] === '처리완료';
-      const isCancelled = o['처리상태'] === '취소';
+      const status      = o['처리상태'] || '미처리';
+      const isDone      = status === '처리완료';
+      const isConfirmed = status === '주문확인';
+      const isCancelled = status === '취소';
       const ts   = new Date(o['타임스탬프']);
       const time = `${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
       const isLate = ts.getHours() >= 15;
+
+      // 상태 배지 색상
+      const badgeClass = isDone ? 'done' : isCancelled ? 'cancelled' : isConfirmed ? 'confirmed' : 'pending';
+
+      // 버튼 구성
+      let buttons = '';
+      if (isCancelled) {
+        buttons = `<button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>`;
+      } else if (isDone) {
+        buttons = `
+          <button class="btn btn-sm btn-gray" onclick="toggleStatus(${o.rowIndex},'주문확인')">되돌리기</button>
+          <button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>`;
+      } else if (isConfirmed) {
+        buttons = `
+          <button class="btn btn-sm btn-green" onclick="toggleStatus(${o.rowIndex},'처리완료')">완료 처리</button>
+          <button class="btn btn-sm btn-gray" onclick="toggleStatus(${o.rowIndex},'미처리')">되돌리기</button>
+          <button class="btn btn-sm btn-gray" onclick="cancelOrder(${o.rowIndex})">취소</button>
+          <button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>`;
+      } else {
+        buttons = `
+          <button class="btn btn-sm" style="background:#0d6efd;color:#fff" onclick="toggleStatus(${o.rowIndex},'주문확인')">주문확인</button>
+          <button class="btn btn-sm btn-green" onclick="toggleStatus(${o.rowIndex},'처리완료')">완료 처리</button>
+          <button class="btn btn-sm btn-gray" onclick="cancelOrder(${o.rowIndex})">취소</button>
+          <button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>`;
+      }
+
       return `
         <div class="order-card ${isDone || isCancelled ? 'done' : ''}">
           <div class="order-head">
@@ -726,19 +760,12 @@
               <div class="order-name">${o['업체명'] || ''}</div>
               <div class="order-time">
                 ${time} · ${o['전화번호'] || ''}
-                ${isLate && !isDone ? '<span style="color:var(--orange);font-weight:700;margin-left:4px">⚠️ 익일출고</span>' : ''}
+                ${isLate && !isDone && !isCancelled ? '<span style="color:var(--orange);font-weight:700;margin-left:4px">⚠️ 익일출고</span>' : ''}
               </div>
             </div>
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-              <span class="status-badge ${isDone ? 'done' : isCancelled ? 'cancelled' : 'pending'}">
-                ${isDone ? '처리완료' : isCancelled ? '취소' : '미처리'}
-              </span>
-              ${!isCancelled ? `<button class="btn btn-sm ${isDone ? 'btn-gray' : 'btn-green'}"
-                onclick="toggleStatus(${o.rowIndex},'${isDone ? '미처리' : '처리완료'}')">
-                ${isDone ? '되돌리기' : '완료 처리'}
-              </button>` : ''}
-              <button class="btn btn-sm btn-gray" onclick="cancelOrder(${o.rowIndex})">취소</button>
-              <button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>
+              <span class="status-badge ${badgeClass}">${status}</span>
+              ${buttons}
             </div>
           </div>
           <div class="order-body">
@@ -782,8 +809,12 @@
 
   // ── CJ대한통운 엑셀 다운로드 ─────────────────────────
   function downloadCJ() {
-    const dayOrders = allOrders.filter(o => dateKey(o['타임스탬프']) === viewDate && o['처리상태'] !== '취소');
-    if (!dayOrders.length) { alert('해당 날짜 주문이 없습니다.'); return; }
+    // CJ: 미처리 + 주문확인만 (처리완료=이미 송장뽑음, 취소 제외)
+    const dayOrders = allOrders.filter(o => {
+      const s = o['처리상태'];
+      return dateKey(o['타임스탬프']) === viewDate && s !== '취소' && s !== '처리완료';
+    });
+    if (!dayOrders.length) { alert('출력할 주문이 없습니다.\n(처리완료/취소 제외)'); return; }
 
     const headers = [
       '받는분성명','받는분전화번호','받는분주소(전체, 분할)',
