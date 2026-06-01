@@ -342,6 +342,7 @@
     <div class="action-row">
       <button class="btn btn-green" onclick="downloadCJ()">📥 CJ택배 송장 엑셀</button>
       <button class="btn btn-outline" onclick="showEntaxModal()">📊 엔텍스 거래내역</button>
+      <button class="btn btn-outline" onclick="showManualOrderModal()" style="border-color:var(--orange);color:var(--orange)">✏️ 수동 주문 입력</button>
     </div>
 
     <!-- 필터 -->
@@ -424,6 +425,30 @@
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 수동 주문 입력 모달 -->
+<div class="modal-overlay" id="manual-order-modal" style="display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px">
+  <div class="modal" style="max-width:420px;text-align:left;margin:auto">
+    <h3 style="margin-bottom:14px">✏️ 수동 주문 입력</h3>
+
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">업체 선택</label>
+    <select id="manual-client" style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;font-size:.9rem;margin-bottom:12px" onchange="onManualClientChange()">
+      <option value="">-- 업체를 선택하세요 --</option>
+    </select>
+
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:6px">품목별 수량</label>
+    <div id="manual-items" style="border:2px solid var(--border);border-radius:8px;margin-bottom:12px;max-height:260px;overflow-y:auto"></div>
+
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">요청사항 (선택)</label>
+    <textarea id="manual-note" style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;font-size:.88rem;font-family:inherit;resize:none;height:64px;margin-bottom:14px" placeholder="요청사항 입력..."></textarea>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-gray" style="flex:1" onclick="closeManualOrderModal()">취소</button>
+      <button class="btn btn-green" style="flex:1" id="manual-submit-btn" onclick="submitManualOrder()">주문 접수</button>
+    </div>
+    <div id="manual-error" style="color:var(--red);font-size:.82rem;margin-top:8px;text-align:center"></div>
   </div>
 </div>
 
@@ -1054,6 +1079,95 @@
     }
     wrap.style.display = 'block';
     wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── 수동 주문 입력 ────────────────────────────────────
+  function showManualOrderModal() {
+    // 업체 드롭다운 채우기
+    const sel = document.getElementById('manual-client');
+    sel.innerHTML = '<option value="">-- 업체를 선택하세요 --</option>';
+    allClients.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+    document.getElementById('manual-items').innerHTML = '<div style="padding:12px;color:var(--gray);font-size:.85rem">업체를 먼저 선택해 주세요</div>';
+    document.getElementById('manual-note').value = '';
+    document.getElementById('manual-error').textContent = '';
+    document.getElementById('manual-order-modal').style.display = 'flex';
+  }
+
+  function closeManualOrderModal() {
+    document.getElementById('manual-order-modal').style.display = 'none';
+  }
+
+  function onManualClientChange() {
+    const grid = document.getElementById('manual-items');
+    if (!allStock.length) {
+      grid.innerHTML = '<div style="padding:12px;color:var(--gray);font-size:.85rem">재고 데이터를 불러오는 중...</div>';
+      return;
+    }
+    const stockMap = {};
+    allStock.forEach(s => { stockMap[s.name] = s.quantity; });
+
+    grid.innerHTML = allProducts.map(p => {
+      const qty = stockMap[p.name] ?? 0;
+      const isOut = qty === 0;
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:.9rem">${p.name}</div>
+            <div style="font-size:.75rem;color:${isOut ? 'var(--red)' : 'var(--gray)'}">재고: ${isOut ? '품절' : qty+'개'}</div>
+          </div>
+          <input type="number" min="0" value="0"
+            id="manual-qty-${p.name}"
+            style="width:64px;padding:6px;border:2px solid var(--border);border-radius:7px;text-align:center;font-size:.95rem;font-weight:700"
+            ${isOut ? 'disabled' : ''} />
+        </div>`;
+    }).join('');
+  }
+
+  async function submitManualOrder() {
+    const clientName = document.getElementById('manual-client').value;
+    const errEl      = document.getElementById('manual-error');
+    errEl.textContent = '';
+
+    if (!clientName) { errEl.textContent = '업체를 선택해 주세요.'; return; }
+
+    const client = allClients.find(c => c.name === clientName);
+    const items  = {};
+    allProducts.forEach(p => {
+      const val = parseInt(document.getElementById('manual-qty-' + p.name)?.value) || 0;
+      if (val > 0) items[p.name] = val;
+    });
+
+    if (!Object.keys(items).length) { errEl.textContent = '품목을 1개 이상 선택해 주세요.'; return; }
+
+    const btn = document.getElementById('manual-submit-btn');
+    btn.disabled = true;
+    btn.textContent = '접수 중...';
+
+    try {
+      const res = await apiPost('submitOrder', {
+        clientName: client.name,
+        phone:      client.phone || '',
+        address:    client.address || '',
+        items,
+        note: document.getElementById('manual-note').value.trim()
+      });
+
+      if (res.error) throw new Error(res.error);
+
+      closeManualOrderModal();
+      await refreshAll();
+      alert(`✅ ${clientName} 주문이 접수되었습니다.`);
+    } catch(e) {
+      errEl.textContent = '오류: ' + e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '주문 접수';
+    }
   }
 
   // ── ENtax CS 다운로드 ─────────────────────────────────
