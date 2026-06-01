@@ -777,7 +777,7 @@
     ]);
 
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, [], ...rows]); // 2행 빈행, 3행부터 데이터
     XLSX.utils.book_append_sheet(wb, ws, '송장');
     XLSX.writeFile(wb, `CJ_${viewDate}.xls`);
   }
