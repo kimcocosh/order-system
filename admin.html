@@ -476,6 +476,28 @@
 
 <script>
   // ══════════════════════════════════════════════════════
+  // ★ 박스 수량 계산 설정
+  const BOX_GROUPS = [
+    { capacity: 28, items: ['오리지널(달콤)','새콤','옥수수','고구마','바나나','망고','패션후르츠','블러드오렌지','말차','토마토','블루베리'] },
+    { capacity: 20, items: ['라이트&드라이','옥수수7도','생쌀9도'] },
+    { capacity: 6,  items: ['이밤에취해','옥주15-감','옥주15-신','옥주15-무'] },
+  ];
+
+  function calcBoxes(itemStr) {
+    // "망고 10 패션후르츠 5" 형식 파싱
+    const tokens = (itemStr || '').trim().split(/\s+/);
+    const qtyMap = {};
+    for (let i = 0; i + 1 < tokens.length; i += 2) {
+      qtyMap[tokens[i]] = parseInt(tokens[i+1]) || 0;
+    }
+    let total = 0;
+    BOX_GROUPS.forEach(g => {
+      const groupQty = g.items.reduce((s, n) => s + (qtyMap[n] || 0), 0);
+      if (groupQty > 0) total += Math.ceil(groupQty / g.capacity);
+    });
+    return total || 1;
+  }
+
   // ★ 사업자번호 대체 설정
   // 특정 업체 주문이 들어왔을 때 다른 업체의 사업자번호로 계산서 발행할 경우
   // { '실제 주문 업체명': '계산서 발행 업체명' }
@@ -771,7 +793,9 @@
       o['업체명']   || '',
       o['전화번호'] || '',
       o['주소']     || '',
-      '신선식품(냉장)', 1, '신용', '극소',
+      '신선식품(냉장)',
+      calcBoxes(o['내품명']),
+      '신용', '극소',
       o['내품명']   || '',
       o['요청사항'] || ''
     ]);
