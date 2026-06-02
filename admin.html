@@ -571,10 +571,15 @@
     '이소현담당자님':'176-82-78951',
   };
 
-  // ★ 사업자번호 대체 설정
-  // 특정 업체 주문이 들어왔을 때 다른 업체의 사업자번호로 계산서 발행할 경우
+  // ★ 계산서 발행 업체 대체 설정
+  // 특정 업체 주문이 들어왔을 때 다른 업체명+사업자번호로 계산서 발행할 경우
   // { '실제 주문 업체명': '계산서 발행 업체명' }
   const BIZ_NUM_OVERRIDE = {
+    '마마전': '당술유통',
+    '동춘네': '당술유통',
+  };
+  // 거래처명도 함께 변경 (BIZ_NUM_OVERRIDE와 동일하게 설정하면 됨)
+  const CLIENT_NAME_OVERRIDE = {
     '마마전': '당술유통',
     '동춘네': '당술유통',
   };
@@ -1347,9 +1352,10 @@
     let seq = 1;
 
     filtered.forEach(o => {
-      const clientName  = o['업체명'] || '';
-      const bizTarget   = BIZ_NUM_OVERRIDE[clientName] || clientName;
-      const bizNum      = bizMap[bizTarget] || '';
+      const clientName    = o['업체명'] || '';
+      const bizTarget     = BIZ_NUM_OVERRIDE[clientName] || clientName;
+      const bizNum        = bizMap[bizTarget] || '';
+      const entaxClient   = CLIENT_NAME_OVERRIDE[clientName] || clientName;
       const itemStr    = o['내품명'] || '';
       const note       = o['요청사항'] || '';
 
@@ -1369,7 +1375,7 @@
         const entaxName  = PRODUCT_NAME_MAP[item.name] || item.name;
         const entaxCode  = PRODUCT_CODE_MAP[item.name] || '';
         rows.push([
-          seq++, shipDate, '매출', '', bizNum, clientName,
+          seq++, shipDate, '매출', '', bizNum, entaxClient,
           entaxCode, entaxName, '', 'EA', price, item.qty, supply, tax,
           '청구', '과세', '', '', 1, 1,
           note, '', '', '', '', ''
