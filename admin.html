@@ -626,20 +626,23 @@
 
   async function loadBizNums() {
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=거래처`;
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=%EA%B1%B0%EB%9E%98%EC%B2%98`;
       const res  = await fetch(url);
       const text = await res.text();
-      const lines = text.split('\n');
-      lines.forEach(line => {
-        const cols = parseCSVRow(line);
-        const name   = (cols[1] || '').trim();
-        const bizNum = (cols[8] || '').trim();
-        // 헤더/빈행 제외: 사업자번호 형식(숫자-숫자-숫자)인 경우만 저장
+      // gviz JSON은 앞에 /*O_o*/\ngoogle.visualization.Query.setResponse( 형태로 감싸져 있음
+      const jsonStr = text.replace(/^[^{]*/, '').replace(/\);?\s*$/, '');
+      const data = JSON.parse(jsonStr);
+      const rows = data.table.rows;
+      bizNumMap = {};
+      rows.forEach(row => {
+        const cells  = row.c || [];
+        const name   = (cells[1]?.v || '').toString().trim();
+        const bizNum = (cells[8]?.v || '').toString().trim();
         if (name && bizNum && /\d{3}-\d{2}-\d{5}/.test(bizNum)) {
           bizNumMap[name] = bizNum;
         }
       });
-      console.log('사업자번호 로드:', Object.keys(bizNumMap).length, '개');
+      console.log('사업자번호 로드 완료:', Object.keys(bizNumMap).length, '개');
     } catch (e) {
       console.log('사업자번호 로드 실패:', e.message);
     }
