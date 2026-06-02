@@ -1253,7 +1253,8 @@
       return DEFAULT_PRICES[productName] || 0;
     }
 
-    // 거래처 사업자번호 맵 (시트 직접 읽은 데이터)
+    // 사업자번호 최신 데이터로 새로 로드
+    await loadBizNums();
     const bizMap = bizNumMap;
 
     // 기간 내 처리완료 주문만
