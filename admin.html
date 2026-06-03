@@ -354,6 +354,7 @@
       <button class="filter-btn" onclick="setFilter('미처리',this)">미처리</button>
       <button class="filter-btn" onclick="setFilter('주문확인',this)">주문확인</button>
       <button class="filter-btn" onclick="setFilter('처리완료',this)">처리완료</button>
+      <button class="filter-btn" id="filter-all-pending" onclick="setFilter('전체미처리',this)" style="border-color:var(--red);color:var(--red)">🔴 전체 미처리</button>
     </div>
 
     <div id="order-list"></div>
@@ -490,7 +491,7 @@
   <div class="modal" style="max-width:340px;text-align:left">
     <h3 style="margin-bottom:6px">📊 ENtax CS 엑셀 다운로드</h3>
     <p style="font-size:.8rem;color:var(--gray);margin-bottom:14px">처리완료 주문만 출력됩니다</p>
-    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">주문 날짜 (기간)</label>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">출고일 기간</label>
     <div style="display:flex;gap:6px;margin-bottom:10px">
       <input type="date" id="entax-from" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;font-size:.9rem" />
       <span style="line-height:38px;color:var(--gray)">~</span>
@@ -800,6 +801,23 @@
   }
 
   function renderOrders() {
+    // 전체 미처리 건수 배지 업데이트
+    const totalPending = allOrders.filter(o => o['처리상태'] === '미처리' || o['처리상태'] === '주문확인').length;
+    const pendingBtn = document.getElementById('filter-all-pending');
+    pendingBtn.textContent = `🔴 전체 미처리 ${totalPending > 0 ? `(${totalPending})` : ''}`;
+
+    // 전체 미처리 필터
+    if (currentFilter === '전체미처리') {
+      document.getElementById('view-date-label').textContent = '전체 미처리 주문';
+      const allPending = allOrders.filter(o => o['처리상태'] === '미처리' || o['처리상태'] === '주문확인');
+      document.getElementById('stat-today').textContent     = allPending.length;
+      document.getElementById('stat-pending').textContent   = allOrders.filter(o => o['처리상태'] === '미처리').length;
+      document.getElementById('stat-confirmed').textContent = allOrders.filter(o => o['처리상태'] === '주문확인').length;
+      document.getElementById('stat-done').textContent      = '-';
+      renderOrderList(allPending, true);
+      return;
+    }
+
     // 날짜 레이블
     const [y,m,d] = viewDate.split('-');
     const isToday = viewDate === todayStr();
@@ -820,6 +838,10 @@
     if (currentFilter === '미처리')   filtered = pending;
     if (currentFilter === '주문확인') filtered = confirmed;
     if (currentFilter === '처리완료') filtered = done;
+    renderOrderList(filtered, false);
+  }
+
+  function renderOrderList(filtered, showDate) {
 
     const list = document.getElementById('order-list');
     if (!filtered.length) {
@@ -867,7 +889,7 @@
             <div>
               <div class="order-name">${o['업체명'] || ''}</div>
               <div class="order-time">
-                ${time} · ${o['전화번호'] || ''}
+                ${showDate ? `<span style="font-weight:700;color:var(--green)">${dateKey(o['타임스탬프'])} </span>` : ''}${time} · ${o['전화번호'] || ''}
                 ${isLate && !isDone && !isCancelled ? '<span style="color:var(--orange);font-weight:700;margin-left:4px">⚠️ 익일출고</span>' : ''}
               </div>
             </div>
@@ -917,12 +939,12 @@
 
   // ── CJ대한통운 엑셀 다운로드 ─────────────────────────
   function downloadCJ() {
-    // CJ: 미처리 + 주문확인만 (처리완료=이미 송장뽑음, 취소 제외)
+    // 미처리+주문확인 전체 (날짜 무관, 취소/처리완료 제외)
     const dayOrders = allOrders.filter(o => {
       const s = o['처리상태'];
-      return dateKey(o['타임스탬프']) === viewDate && s !== '취소' && s !== '처리완료';
+      return s !== '취소' && s !== '처리완료';
     });
-    if (!dayOrders.length) { alert('출력할 주문이 없습니다.\n(처리완료/취소 제외)'); return; }
+    if (!dayOrders.length) { alert('출력할 주문이 없습니다.\n(미처리/주문확인 상태인 주문이 없음)'); return; }
 
     const headers = [
       '받는분성명','받는분전화번호','받는분주소(전체, 분할)',
@@ -946,7 +968,7 @@
       ...rows        // 3행~: 데이터
     ]);
     XLSX.utils.book_append_sheet(wb, ws, '송장');
-    XLSX.writeFile(wb, `CJ_${viewDate}.xls`);
+    XLSX.writeFile(wb, `CJ_출고${todayStr()}.xls`);
   }
 
   // ── 재고 관리 ─────────────────────────────────────────
@@ -1379,12 +1401,12 @@
 
     await loadBizNums();
 
-    // 기간 내 처리완료 주문만
+    // 출고일 기준 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const dk = dateKey(o['타임스탬프']);
-      return dk >= from && dk <= to && o['처리상태'] === '처리완료';
+      const outDate = (o['출고일'] || '').toString().trim().substring(0, 10);
+      return outDate >= from && outDate <= to && o['처리상태'] === '처리완료';
     });
-    if (!filtered.length) { alert('해당 기간 처리완료 주문이 없습니다.'); return; }
+    if (!filtered.length) { alert('해당 출고일 기간 처리완료 주문이 없습니다.'); return; }
 
     const headers = ['날짜','구분','적요','공급가액','부가세','계정과목','결제방법','거래처'];
 
@@ -1448,13 +1470,13 @@
     await loadBizNums();
     const bizMap = bizNumMap;
 
-    // 기간 내 처리완료 주문만
+    // 출고일 기준 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const dk = dateKey(o['타임스탬프']);
-      return dk >= from && dk <= to && o['처리상태'] === '처리완료';
+      const outDate = (o['출고일'] || '').toString().trim().substring(0, 10);
+      return outDate >= from && outDate <= to && o['처리상태'] === '처리완료';
     });
 
-    if (!filtered.length) { alert('해당 기간 처리완료 주문이 없습니다.'); return; }
+    if (!filtered.length) { alert('해당 출고일 기간 처리완료 주문이 없습니다.'); return; }
 
     const headers = ['번호','작성일자','구분','우리사업자번호','거래처사업자번호','거래처명',
       '제품코드','제품명','규격','단위','단가','수량','공급가액','세액',
