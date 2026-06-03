@@ -437,10 +437,19 @@
   <div class="modal" style="max-width:420px;text-align:left;margin:auto">
     <h3 style="margin-bottom:14px">✏️ 수동 주문 입력</h3>
 
-    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">업체 선택</label>
-    <select id="manual-client" style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;font-size:.9rem;margin-bottom:12px" onchange="onManualClientChange()">
-      <option value="">-- 업체를 선택하세요 --</option>
-    </select>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">업체 검색</label>
+    <div style="position:relative;margin-bottom:12px">
+      <input type="text" id="manual-client-search" placeholder="업체명 입력..."
+        style="width:100%;padding:10px;border:2px solid var(--border);border-radius:8px;font-size:.9rem"
+        oninput="filterManualClients()" autocomplete="off" />
+      <div id="manual-client-dropdown" style="
+        display:none;position:absolute;top:100%;left:0;right:0;
+        background:#fff;border:2px solid var(--green);border-top:none;
+        border-radius:0 0 8px 8px;max-height:200px;overflow-y:auto;
+        z-index:300;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+    </div>
+    <div id="manual-client-selected" style="display:none;background:var(--green-pale);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.88rem;color:var(--green);font-weight:600"></div>
+    <input type="hidden" id="manual-client" />
 
     <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:6px">품목별 수량</label>
     <div id="manual-items" style="border:2px solid var(--border);border-radius:8px;margin-bottom:12px;max-height:260px;overflow-y:auto"></div>
@@ -1241,19 +1250,43 @@
 
   // ── 수동 주문 입력 ────────────────────────────────────
   function showManualOrderModal() {
-    // 업체 드롭다운 채우기
-    const sel = document.getElementById('manual-client');
-    sel.innerHTML = '<option value="">-- 업체를 선택하세요 --</option>';
-    allClients.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.name;
-      opt.textContent = c.name;
-      sel.appendChild(opt);
-    });
+    document.getElementById('manual-client-search').value = '';
+    document.getElementById('manual-client').value = '';
+    document.getElementById('manual-client-selected').style.display = 'none';
+    document.getElementById('manual-client-dropdown').style.display = 'none';
     document.getElementById('manual-items').innerHTML = '<div style="padding:12px;color:var(--gray);font-size:.85rem">업체를 먼저 선택해 주세요</div>';
     document.getElementById('manual-note').value = '';
     document.getElementById('manual-error').textContent = '';
     document.getElementById('manual-order-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('manual-client-search').focus(), 100);
+  }
+
+  function filterManualClients() {
+    const q   = document.getElementById('manual-client-search').value.trim().toLowerCase();
+    const dd  = document.getElementById('manual-client-dropdown');
+    if (!q) { dd.style.display = 'none'; return; }
+
+    const matches = allClients.filter(c => c.name.toLowerCase().includes(q)).slice(0, 20);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+
+    dd.innerHTML = matches.map(c => `
+      <div onclick="selectManualClient('${c.name.replace(/'/g,"\\'")}', '${c.phone}', '${c.address.replace(/'/g,"\\'")}', '${c.key}')"
+        style="padding:10px 14px;cursor:pointer;font-size:.88rem;border-bottom:1px solid var(--border)"
+        onmouseover="this.style.background='var(--green-pale)'"
+        onmouseout="this.style.background=''">
+        ${c.name}
+      </div>`).join('');
+    dd.style.display = 'block';
+  }
+
+  function selectManualClient(name, phone, address, key) {
+    document.getElementById('manual-client').value = name;
+    document.getElementById('manual-client-search').value = name;
+    document.getElementById('manual-client-dropdown').style.display = 'none';
+    const sel = document.getElementById('manual-client-selected');
+    sel.textContent = `✅ ${name}`;
+    sel.style.display = 'block';
+    onManualClientChange();
   }
 
   function closeManualOrderModal() {
@@ -1286,11 +1319,11 @@
   }
 
   async function submitManualOrder() {
-    const clientName = document.getElementById('manual-client').value;
+    const clientName = document.getElementById('manual-client').value.trim();
     const errEl      = document.getElementById('manual-error');
     errEl.textContent = '';
 
-    if (!clientName) { errEl.textContent = '업체를 선택해 주세요.'; return; }
+    if (!clientName) { errEl.textContent = '업체를 검색해서 선택해 주세요.'; return; }
 
     const client = allClients.find(c => c.name === clientName);
     const items  = {};
