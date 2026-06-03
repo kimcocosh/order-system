@@ -864,7 +864,9 @@
       // 버튼 구성
       let buttons = '';
       if (isCancelled) {
-        buttons = `<button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>`;
+        buttons = `
+          <button class="btn btn-sm btn-green" onclick="toggleStatus(${o.rowIndex},'미처리')">되돌리기</button>
+          <button class="btn btn-sm btn-red" onclick="deleteOrder(${o.rowIndex})">삭제</button>`;
       } else if (isDone) {
         buttons = `
           <button class="btn btn-sm btn-gray" onclick="toggleStatus(${o.rowIndex},'주문확인')">되돌리기</button>
