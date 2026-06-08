@@ -471,13 +471,13 @@
   <div class="modal" style="max-width:340px;text-align:left">
     <h3 style="margin-bottom:6px">📗 알찬회계 엑셀 다운로드</h3>
     <p style="font-size:.8rem;color:var(--gray);margin-bottom:14px">처리완료 주문만 출력됩니다</p>
-    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">주문 날짜 (기간)</label>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">출고일 기간</label>
     <div style="display:flex;gap:6px;margin-bottom:10px">
       <input type="date" id="alchan-from" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;font-size:.9rem" />
       <span style="line-height:38px;color:var(--gray)">~</span>
       <input type="date" id="alchan-to" style="flex:1;padding:9px;border:2px solid var(--border);border-radius:8px;font-size:.9rem" />
     </div>
-    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">출고일 (날짜)</label>
+    <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:4px">엑셀에 기록할 출고일</label>
     <input type="date" id="alchan-shipdate" style="width:100%;padding:9px;border:2px solid var(--border);border-radius:8px;margin-bottom:16px;font-size:.9rem" />
     <div style="display:flex;gap:8px">
       <button class="btn btn-gray" style="flex:1" onclick="closeAlchanModal()">취소</button>
@@ -914,7 +914,15 @@
     try {
       await apiPost('updateStatus', { rowIndex, status: newStatus });
       const o = allOrders.find(x => x.rowIndex === rowIndex);
-      if (o) o['처리상태'] = newStatus;
+      if (o) {
+        o['처리상태'] = newStatus;
+        // 로컬 출고일도 즉시 반영 (새로고침 없이 바로 다운로드 가능하도록)
+        if (newStatus === '처리완료') {
+          o['출고일'] = todayStr();
+        } else {
+          o['출고일'] = '';
+        }
+      }
       renderOrders();
     } catch (e) { alert('오류: ' + e.message); }
   }
@@ -1406,7 +1414,7 @@
 
     // 출고일 기준 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const outDate = (o['출고일'] || '').toString().trim().substring(0, 10);
+      const outDate = o['출고일'] ? dateKey(o['출고일']) : '';
       return outDate >= from && outDate <= to && o['처리상태'] === '처리완료';
     });
     if (!filtered.length) { alert('해당 출고일 기간 처리완료 주문이 없습니다.'); return; }
@@ -1475,7 +1483,7 @@
 
     // 출고일 기준 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const outDate = (o['출고일'] || '').toString().trim().substring(0, 10);
+      const outDate = o['출고일'] ? dateKey(o['출고일']) : '';
       return outDate >= from && outDate <= to && o['처리상태'] === '처리완료';
     });
 
