@@ -958,12 +958,9 @@
 
   // ── CJ대한통운 엑셀 다운로드 ─────────────────────────
   function downloadCJ() {
-    // 미처리+주문확인 전체 (날짜 무관, 취소/처리완료 제외)
-    const dayOrders = allOrders.filter(o => {
-      const s = o['처리상태'];
-      return s !== '취소' && s !== '처리완료';
-    });
-    if (!dayOrders.length) { alert('출력할 주문이 없습니다.\n(미처리/주문확인 상태인 주문이 없음)'); return; }
+    // 미처리 주문만 (주문확인/처리완료/취소 제외)
+    const dayOrders = allOrders.filter(o => o['처리상태'] === '미처리');
+    if (!dayOrders.length) { alert('출력할 주문이 없습니다.\n(미처리 상태인 주문이 없음)'); return; }
 
     const headers = [
       '받는분성명','받는분전화번호','받는분주소(전체, 분할)',
