@@ -388,6 +388,13 @@
   // ── 유리병 최소 ──
   const R_GLASS_MIN = 6;
 
+  // ── 재고 없어도 항상 주문 가능한 업체-품목 설정 ──
+  const ALWAYS_AVAILABLE = {
+    '웅칼(강남점)': ['옥주6'],
+    '웅칼(화곡점)': ['옥주6'],
+    '웅칼(성수점)': ['옥주6'],
+  };
+
   // ══════════════════════════════════════════════════════
 
   const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxbpnr3MeRL9fpeMDnks3f1rPnD3aFbgPuy77doP7qJsijON0T0sIgCAexqCScKfEh0LA/exec';
@@ -444,9 +451,11 @@
     list.innerHTML = '';
 
     products.forEach(p => {
-      const qty    = stock[p.name] ?? 0;
-      const isOut  = qty === 0;
-      const row    = document.createElement('div');
+      const qty         = stock[p.name] ?? 0;
+      const alwaysOk    = (ALWAYS_AVAILABLE[client.name] || []).includes(p.name);
+      const isOut       = qty === 0 && !alwaysOk;
+      const maxQty      = alwaysOk ? 9999 : qty;
+      const row         = document.createElement('div');
       row.className = 'item-row';
       row.dataset.name = p.name;
       row.dataset.stock = qty;
@@ -455,7 +464,7 @@
         <div class="item-info">
           <div class="item-name">${p.name}</div>
           <div class="item-stock ${isOut ? 'out' : ''}">
-            재고: ${isOut ? '품절' : qty + '개'}
+            재고: ${isOut ? '품절' : qty + '개'}${alwaysOk && qty === 0 ? ' (상시 발주)' : ''}
           </div>
           <div class="item-warn" id="warn-${esc(p.name)}"></div>
         </div>
@@ -464,7 +473,7 @@
           : `<div class="qty-wrap">
                <button class="qty-btn" onclick="changeQty('${esc(p.name)}',-1)">−</button>
                <input class="qty-input" type="number" id="qty-${esc(p.name)}"
-                 value="0" min="0" max="${qty}"
+                 value="0" min="0" max="${maxQty}"
                  oninput="onQtyInput('${esc(p.name)}')" />
                <button class="qty-btn" onclick="changeQty('${esc(p.name)}',1)">+</button>
              </div>`
