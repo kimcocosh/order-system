@@ -1568,6 +1568,17 @@
 
   // 오늘 날짜를 날짜 입력 기본값으로
   document.getElementById('template-date').value = todayStr();
+
+  // 3분마다 주문 데이터 자동 새로고침 (취소/신규 주문 자동 반영)
+  setInterval(async () => {
+    try {
+      const [oRes, cRes] = await Promise.all([api('orders'), api('clients')]);
+      allOrders  = oRes.orders  || [];
+      allClients = cRes.clients || [];
+      renderOrders();
+      renderTemplateClients();
+    } catch (e) { /* 실패해도 무시 */ }
+  }, 3 * 60 * 1000);
 </script>
 </body>
 </html>
