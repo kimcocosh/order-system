@@ -876,7 +876,7 @@
       const isCancelled = status === '취소';
       const ts   = new Date(o['타임스탬프']);
       const time = `${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`;
-      const isLate = ts.getHours() >= 15;
+      const isLate = ts.getHours() >= 14;
 
       // 상태 배지 색상
       const badgeClass = isDone ? 'done' : isCancelled ? 'cancelled' : isConfirmed ? 'confirmed' : 'pending';
@@ -1175,7 +1175,7 @@
   // ── 캘린더 ───────────────────────────────────────────
   let calYear  = new Date().getFullYear();
   let calMonth = new Date().getMonth(); // 0-based
-  const ORDER_DEADLINE_HOUR = 15; // 오후 3시
+  const ORDER_DEADLINE_HOUR = 14; // 오후 2시
 
   function switchTab(name) {
     const names = ['orders','calendar','stock','products','template'];
@@ -1239,7 +1239,7 @@
         <div class="${cls}" onclick="${cnt ? `showDayOrders('${key}')` : ''}">
           <div class="cal-num">${d}</div>
           ${cnt ? `<div class="cal-badge">${cnt}건</div>` : ''}
-          ${isToday ? `<div class="cal-deadline">마감 15:00</div>` : ''}
+          ${isToday ? `<div class="cal-deadline">마감 14:00</div>` : ''}
         </div>`;
     }
 
@@ -1459,6 +1459,18 @@
       rows.push([
         shipDate, '', 적요, totalSupply, tax, '상품매출', '외상매출금', entaxClient
       ]);
+
+      // 아람주류: 박스당 택배비 4,000원 (부가세 별도) 행 추가
+      if (clientName === '아람주류') {
+        const boxes = countBoxes(itemStr);
+        if (boxes > 0) {
+          const deliverySupply = 4000 * boxes;
+          const deliveryTax    = 400  * boxes;
+          rows.push([
+            shipDate, '', '택배비', deliverySupply, deliveryTax, '상품매출', '외상매출금', entaxClient
+          ]);
+        }
+      }
     });
 
     const wb = XLSX.utils.book_new();
@@ -1543,6 +1555,21 @@
           note, '', '', '', '', ''
         ]);
       });
+
+      // 아람주류: 박스당 택배비 4,000원 (부가세 별도) 행 추가
+      if (clientName === '아람주류') {
+        const boxes = countBoxes(itemStr);
+        if (boxes > 0) {
+          const deliverySupply = 4000 * boxes;
+          const deliveryTax    = 400  * boxes;
+          rows.push([
+            seq++, shipDate, '매출', '', bizNum, entaxClient,
+            '택배비', '택배비', '', 'BOX', 4000, boxes, deliverySupply, deliveryTax,
+            '청구', '', deliverySupply + deliveryTax, '', 1, 1,
+            note, '', '', '', '', ''
+          ]);
+        }
+      }
     });
 
     if (!rows.length) { alert('품목 데이터를 파싱할 수 없습니다.'); return; }
