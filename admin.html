@@ -1468,7 +1468,7 @@
 
       // 아람주류: 박스당 택배비 4,000원 (부가세 별도) 행 추가
       if (clientName === '아람주류') {
-        const boxes = countBoxes(itemStr);
+        const boxes = calcBoxes(itemStr);
         if (boxes > 0) {
           const deliverySupply = 4000 * boxes;
           const deliveryTax    = 400  * boxes;
@@ -1564,7 +1564,7 @@
 
       // 아람주류: 박스당 택배비 4,000원 (부가세 별도) 행 추가
       if (clientName === '아람주류') {
-        const boxes = countBoxes(itemStr);
+        const boxes = calcBoxes(itemStr);
         if (boxes > 0) {
           const deliverySupply = 4000 * boxes;
           const deliveryTax    = 400  * boxes;
