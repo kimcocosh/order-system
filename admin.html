@@ -1436,7 +1436,7 @@
 
     // 출고일 기준 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const outDate = o['출고일'] ? dateKey(o['출고일']) : '';
+      const outDate = o['출고일'] ? dateKey(o['출고일']) : dateKey(o['타임스탬프']);
       return outDate >= from && outDate <= to && o['처리상태'] === '처리완료';
     });
     if (!filtered.length) { alert('해당 출고일 기간 처리완료 주문이 없습니다.'); return; }
@@ -1517,7 +1517,7 @@
 
     // 출고일 기준 처리완료 주문만
     const filtered = allOrders.filter(o => {
-      const outDate = o['출고일'] ? dateKey(o['출고일']) : '';
+      const outDate = o['출고일'] ? dateKey(o['출고일']) : dateKey(o['타임스탬프']);
       return outDate >= from && outDate <= to && o['처리상태'] === '처리완료';
     });
 
