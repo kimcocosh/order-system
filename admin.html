@@ -1555,7 +1555,10 @@
       const bizNum        = bizMap[bizTarget] || '';
       const entaxClient   = CLIENT_NAME_OVERRIDE[clientName] || clientName;
       const itemStr    = o['내품명'] || '';
-      const note       = o['요청사항'] || '';
+      const noteRaw    = o['요청사항'] || '';
+      const note       = CLIENT_NAME_OVERRIDE[clientName]
+        ? (noteRaw ? `[${clientName}] ${noteRaw}` : `[${clientName}]`)
+        : noteRaw;
 
       // "망고 10 패션후르츠 5" 파싱
       const tokens = itemStr.trim().split(/\s+/);
