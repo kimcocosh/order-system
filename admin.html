@@ -639,6 +639,13 @@
     '놈브루어리': '놈맥주컴퍼니',
   };
 
+  // ★ 종사업자번호 매핑 { '업체명': '종사업자번호' }
+  const SUB_BIZ_NUM = {
+    '웅칼(강남점)': '강남점',
+    '웅칼(화곡점)': '화곡점',
+    '웅칼(성수점)': '성수점',
+  };
+
   // ★ ENtax 제품코드 매핑 (주문서 품목명 → ENtax 제품코드)
   // ══════════════════════════════════════════════════════
   const PRODUCT_CODE_MAP = {
@@ -1541,7 +1548,7 @@
 
     if (!filtered.length) { alert('해당 출고일 기간 처리완료 주문이 없습니다.'); return; }
 
-    const headers = ['번호','작성일자','구분','우리사업자번호','거래처사업자번호','거래처명',
+    const headers = ['번호','작성일자','구분','우리사업자번호','거래처사업자번호','거래처종사업자번호','거래처명',
       '제품코드','제품명','규격','단위','단가','수량','공급가액','세액',
       '영수청구','결제방식','미수금','증빙서','간편장부','고정자산',
       '비고','카드번호','주문번호','판매방식','일련번호','큰상자'];
@@ -1554,6 +1561,7 @@
       const bizTarget     = BIZ_NUM_OVERRIDE[clientName] || clientName;
       const bizNum        = bizMap[bizTarget] || '';
       const entaxClient   = CLIENT_NAME_OVERRIDE[clientName] || clientName;
+      const subBizNum  = SUB_BIZ_NUM[clientName] || '';
       const itemStr    = o['내품명'] || '';
       const noteRaw    = o['요청사항'] || '';
       const note       = CLIENT_NAME_OVERRIDE[clientName]
@@ -1576,7 +1584,7 @@
         const entaxName  = PRODUCT_NAME_MAP[item.name] || item.name;
         const entaxCode  = PRODUCT_CODE_MAP[item.name] || '';
         rows.push([
-          seq++, shipDate, '매출', '', bizNum, entaxClient,
+          seq++, shipDate, '매출', '', bizNum, subBizNum, entaxClient,
           entaxCode, entaxName, '', 'EA', price, item.qty, supply, tax,
           '청구', '', supply + tax, '', 1, 1,
           note, '', '', '', '', ''
@@ -1590,7 +1598,7 @@
           const deliverySupply = 4000 * boxes;
           const deliveryTax    = 400  * boxes;
           rows.push([
-            seq++, shipDate, '매출', '', bizNum, entaxClient,
+            seq++, shipDate, '매출', '', bizNum, subBizNum, entaxClient,
             '택배비', '택배비', '', 'BOX', 4000, boxes, deliverySupply, deliveryTax,
             '청구', '', deliverySupply + deliveryTax, '', 1, 1,
             note, '', '', '', '', ''
